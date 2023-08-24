@@ -42,8 +42,8 @@ float Distancia = 0.00;                   // variavel para guardar a distancia
 
 //Velocidades dos motores (você pode calibrar cada motor colocando os valores de 0 a 254)
 
-int velocidadeMotorUm = 80;
-int velocidadeMotorDois = 95;
+int velocidadeMotorUm = 120;
+int velocidadeMotorDois = 120;
 
 // Função que é executado na inicialização do Arduino
 
@@ -80,11 +80,7 @@ int sensor = digitalRead(pinoS);
 Serial.print("_ queda:");
 Serial.println(sensor);
 
-if(sensor == 1){
-Parar ();                                         // O robô Para
-ParaTras ();                                      // O robô vai para tras
-VireaEsquerda();
-}
+
 
 
 if (Distancia < 30) {                             // Se há obstáculo encontrado a menos de 40cm.
@@ -99,7 +95,7 @@ Frente ();                                      // Robô se move para a direçã
 // Função para pegar as distancias de cada direção
 void direcao () {        
 Parar ();                                         // O robô Para
-ParaTras ();                                      // O robô vai para tras
+ParaTras();
 Parar ();                                         // O robô Para
 servoSensor.write (180);                          // Gira o Servo com o sensor a 180 graus
 delay (1000);              
@@ -114,6 +110,11 @@ delay (500);
 CompareDistance ();                               // Encontre a distância mais longa.
 }
 // Função para calcular qual a distancia é melhor para o robô ir
+
+
+
+
+
 void CompareDistance () {                   
 if (DistanciaDireita > DistanciaEsquerda) {       // Se a direita está menos obstruída.
 Vireadireita ();                                // O robô vai virar a direita 
@@ -121,10 +122,15 @@ Vireadireita ();                                // O robô vai virar a direita
 else if (DistanciaEsquerda > DistanciaDireita) {  // Se Esquerda estiver menos obstruída.
 VireaEsquerda ();                               // Robô Vire na direção esquerda.
 }
-else {                                            // Se ambos estiverem igualmente obstruídos.
-Retorne ();                                     // Robô Vire-se.
+else {                                            // Se ambos estiverem igualmente obstruídos. 
+obstacolo ();                        
 }
 }
+
+
+
+
+
 // Função para fazer o carro parar
 void Parar()
 {
@@ -136,19 +142,88 @@ digitalWrite(in4, LOW);
 delay(100);                                       //aguarda um tempo
 }
 // Função para fazer o robô andar para frente
+
 void Frente()
 {
 Serial.println("Robô: Frente ");
 digitalWrite(in1, HIGH);                          //Configurar a ponte h 
 digitalWrite(in2, LOW);
-digitalWrite(in3, HIGH);
+
+digitalWrite(in3, HIGH); 
 digitalWrite(in4, LOW);
 analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
 analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
 }
+
+
+void Vireadireita (){
+Serial.println("Robô: Direita ");
+digitalWrite(in1, HIGH);                           //MOTOR 1 
+digitalWrite(in2, LOW);
+
+digitalWrite(in3, LOW);                          //MOTOR 2
+digitalWrite(in4, HIGH);
+
+delay(900);                                       //aguarda um tempo
+
+
+analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
+analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+}
+
+
+
+
+void VireaEsquerda(){
+
+Serial.println("Robô: Esquerda ");                
+digitalWrite(in1, LOW);                           //MOTOR 1 
+digitalWrite(in2, HIGH);
+
+digitalWrite(in3, HIGH);                          //MOTOR 2
+digitalWrite(in4, LOW);
+
+delay(900);                                       //aguarda um tempo
+
+
+analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
+analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+}                        
+
+
 // Função que faz o robô andar para trás e emite som quando ele dá ré
 void ParaTras()
 {
+Serial.println("Robô: Ré ");
+digitalWrite(in1, LOW);                          //Configurar a ponte h 
+digitalWrite(in2, HIGH);
+
+digitalWrite(in3, LOW); 
+digitalWrite(in4, HIGH);
+analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
+analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+}
+
+void Retorne () {    
+Serial.println("Robô: Girar ");      
+digitalWrite(in1, HIGH);                          //Configurar a ponte h 
+digitalWrite(in2, LOW);
+digitalWrite(in3, HIGH);
+digitalWrite(in4, LOW);
+delay (1000);                                      //aguarda um tempo
+analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
+analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+}
+
+
+void obstacolo () {    
+Serial.println("Robô: Parar ");
+digitalWrite(in1, LOW);                           //Configurar a ponte h 
+digitalWrite(in2, LOW);
+digitalWrite(in3, LOW);
+digitalWrite(in4, LOW);
+delay(100);                                       //aguarda um tempo
+
 Serial.println("Robô: Ré ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
 digitalWrite(in2, HIGH);
@@ -156,11 +231,8 @@ digitalWrite(in3, LOW);
 digitalWrite(in4, HIGH);
 delay(300);                                       //aguarda um tempo
 analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
-}
-// Função que faz o robô virar à direita, https://SeuRobo.com.br/
-void Vireadireita()
-{
+analogWrite(enB, velocidadeMotorDois);  
+
 Serial.println("Robô: Direita ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
 digitalWrite(in2, HIGH);
@@ -168,30 +240,23 @@ digitalWrite(in3, HIGH);
 digitalWrite(in4, LOW);
 delay(300);                                       //aguarda um tempo
 analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
-}
-// Função que faz o robô virar à esquerda
-void VireaEsquerda()
-{
-Serial.println("Robô: Esquerda ");                
-digitalWrite(in1, HIGH);                          //Configurar a ponte h 
-digitalWrite(in2, LOW);
+analogWrite(enB, velocidadeMotorDois); 
+
+Serial.println("Robô: Ré ");
+digitalWrite(in1, LOW);                           //Configurar a ponte h 
+digitalWrite(in2, HIGH);
+digitalWrite(in3, LOW);
+digitalWrite(in4, HIGH);
+delay(300);                                       //aguarda um tempo
+analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
+analogWrite(enB, velocidadeMotorDois);  
+
+Serial.println("Robô: Direita ");
+digitalWrite(in1, LOW);                           //Configurar a ponte h 
+digitalWrite(in2, HIGH);
 digitalWrite(in3, HIGH);
 digitalWrite(in4, LOW);
 delay(300);                                       //aguarda um tempo
 analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
-}
-//Função para o robô virar para o outro lado
-void Retorne () {    
-Serial.println("Robô: Girar ");      
-digitalWrite(in1, HIGH);                          //Configurar a ponte h 
-digitalWrite(in2, LOW);
-digitalWrite(in3, HIGH);
-digitalWrite(in4, LOW);
-delay (700);                                      //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
-}
-//Fim
-//Versão do Software: 1.0 SR 2 SeuRobo.com.br //não apague essa linha, para futuras consultas
+analogWrite(enB, velocidadeMotorDois); 
+}                        
