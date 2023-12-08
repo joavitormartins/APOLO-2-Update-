@@ -1,120 +1,172 @@
-#include <Servo.h>     // Adiciona a biblitoeca Servo
-//Definindo os pinos
-#define trigPin A3     //Pino TRIG do sensor no pino analógico A0
-#define echoPin A4     //Pino ECHO do sensor no pino analógico A1
+#include <ESP32Servo.h>
+#include <BluetoothSerial.h>
 
-// motor um            // Ligação dos pinos da Ponte H L298N
-#define enA  11        //pino enA na porta digital 10
-#define in1  9         //pino in1 na porta digital 9
-#define in2  8         //pino in2 na porta digital 8
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
 
-// motor dois          // Ligação dos pinos da Ponte H L298N
-#define enB  5         //pino enB na porta digital 5
-#define in3  7         //pino in3 na porta digital 7
-#define in4  6         //pino in4 na porta digital 6
-#define pinoS 3
-       
-Servo servoSensor;       // Crie um objeto Servo para controlar o Servo.
-//função para procurar obtasculo a todo o tempo
-int Procurar (void) {
-float duracao = 0.0;              // variavael para quartar a duração do retorno do som
-float CM = 0.0;                   // variavael para quartar a distancia
+BluetoothSerial SerialBT;
+Servo myservo;
 
-digitalWrite(trigPin, LOW);       //não envia som
-delayMicroseconds(2);
-digitalWrite(trigPin, HIGH);      //envia som
-delayMicroseconds(10);
-digitalWrite(trigPin, LOW);       //não envia o som e espera o retorno do som enviado
-duracao = pulseIn(echoPin, HIGH); //Captura a duração em tempo do retorno do som.
+char valorRecebido = '\0';
 
-CM = (duracao / 58.8);            //Calcula a distância em centimetros
+#define trigPin 26
+#define echoPin 27
 
-Serial.print("Distancia em CM: "); //Imprimi no monitor serial a distancia
-Serial.print(CM);              
+#define trigPinD 2 
+#define echoPinD 15     
 
+#define enA 21
+#define in1 25
+#define in2 33
 
+#define enB 19
+#define in3 23
+#define in4 22
 
-return CM;                        // Return to CM.
-}
-//Variaveis
-int DistanciaDireita, DistanciaEsquerda;  // variavel de Distâncias de ambos os lados
-float Distancia = 0.00;                   // variavel para guardar a distancia
+int velocidadeMotorUm = 250;
+int velocidadeMotorDois = 250;
 
-//Velocidades dos motores (você pode calibrar cada motor colocando os valores de 0 a 254)
-
-int velocidadeMotorUm = 120;
-int velocidadeMotorDois = 120;
-
-// Função que é executado na inicialização do Arduino
+int DistanciaDireita = 0;
+int DistanciaEsquerda = 0;
+float Distancia = 0.00;
+float DistanciaD = 0.00;
 
 void setup() {
-Serial.begin(9600); // inicializa a comunicação serial para mostrar dados
-servoSensor.attach(13); //Define o servo na porta 13
+  SerialBT.begin("APOLO-2");
+  Serial.begin(9600);
+  
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+  
+  myservo.setPeriodHertz(50);
+  myservo.attach(5, 500, 2400);
+  
+  pinMode(enA, OUTPUT);
+  pinMode(enB, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
 
-// Definir todos os pinos de controle do motor como saídas
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 
-pinMode(pinoS,INPUT);
-
-pinMode(enA, OUTPUT);
-pinMode(enB, OUTPUT);
-pinMode(in1, OUTPUT);
-pinMode(in2, OUTPUT);
-pinMode(in3, OUTPUT);
-pinMode(in4, OUTPUT);
-
-//Configuraçõs do sensor ultrassonico
-
-pinMode(trigPin, OUTPUT);     //define o pino TRIG como saída
-pinMode(echoPin, INPUT);      //define o pino ECHO como entrada
+  pinMode(trigPinD, OUTPUT);
+  pinMode(echoPinD, INPUT);
 }
-// Função principal do Arduino
-
 
 void loop() {
-servoSensor.write (90);                           // Gira o Servo com o sensor a 90 graus
+  if (SerialBT.available()) {
+    valorRecebido = (char)SerialBT.read();
+    Serial.write(valorRecebido);
+  }
+
+  if (valorRecebido == '0') {
+    Parar();
+  } else if (valorRecebido == '1') {
+    autonomo();
+  } else {
+    controleTotal();
+  }
+}
+
+void controleTotal() {
+  if (valorRecebido == 'f') {
+    Frente();
+  } else if (valorRecebido == 't') {
+    ParaTras();
+  } else if (valorRecebido == 'p') {
+    Parar();
+  } else if (valorRecebido == 'd') {
+digitalWrite(in1, LOW);                            //MOTOR 1 
+digitalWrite(in2, HIGH);
+digitalWrite(in3, HIGH);                           //MOTOR 2
+digitalWrite(in4, LOW);
+  } else if (valorRecebido == 'e') {
+digitalWrite(in1, HIGH);                           //MOTOR 1 
+digitalWrite(in2, LOW);
+digitalWrite(in3, LOW);                            //MOTOR 2
+digitalWrite(in4, HIGH);
+  }
+  DistanciaD = ProcurarD (); 
+  if (DistanciaD < 30){pulo();}else{Parar();}
+}
+
+void autonomo() {
+  // Seu código para o modo autônomo aqui
+myservo.write(90);                                // Gira o Servo com o sensor a 90 graus
 delay (100);                                      // Aguarda 100 milesugodos
 Distancia = Procurar ();                          // Medindo a Distancia em CM.
-
-int sensor = digitalRead(pinoS);
-
-Serial.print("_ queda:");
-Serial.println(sensor);
-
-
-
-
-if (Distancia < 30) {                             // Se há obstáculo encontrado a menos de 40cm.
-direcao ();                                      // Se Frente estiver bloqueado, mude de direção
+if (Distancia < 50) {                             // Se há obstáculo encontrado a menos de 50cm.
+direcao ();                                       // Se Frente estiver bloqueado, mude de direção
 }
-else if (Distancia >= 30)  {                      // Se o obstáculo for encontrado entre a mais de 40cm 
-Frente ();                                      // Robô se move para a direção da Frente.
+else if (Distancia >= 50)  {                      // Se o obstáculo for encontrado entre a mais de 50cm 
+Frente ();    
 }
-//Seu Robô http://SeuRobo.com.br/
+  
 }
 
-// Função para pegar as distancias de cada direção
+int Procurar (void) {
+float duracao = 0.0;              
+float CM = 0.0;                   
+
+digitalWrite(trigPin, LOW);       
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);      
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);       
+duracao = pulseIn(echoPin, HIGH); 
+
+CM = (duracao / 58.8);           
+
+Serial.print("Distancia em CM: "); 
+Serial.print(CM);              
+
+return CM;                        
+}
+
+int ProcurarD (void) {
+float duracaoD = 0.0;              
+float CMD = 0.0;                   
+
+digitalWrite(trigPinD, LOW);       
+delayMicroseconds(2);
+digitalWrite(trigPinD, HIGH);      
+delayMicroseconds(10);
+digitalWrite(trigPinD, LOW);       
+duracaoD = pulseIn(echoPinD, HIGH); 
+
+CMD = (duracaoD / 58.8);           
+
+Serial.print("DistanciaD em CM: "); 
+Serial.print(CMD);              
+
+return CMD;                        
+}
+
 void direcao () {        
 Parar ();                                         // O robô Para
 ParaTras();
 Parar ();                                         // O robô Para
-servoSensor.write (180);                          // Gira o Servo com o sensor a 180 graus
+myservo.write (180);                          // Gira o Servo com o sensor a 180 graus
 delay (1000);              
 DistanciaEsquerda = Procurar ();                  // Defina a Distancia da Esquerda 
 delay (500);               
-servoSensor.write (0);                            // Gira o Servo com o sensor a 0 graus
+myservo.write (0);                            // Gira o Servo com o sensor a 0 graus
 delay (500);               
 DistanciaDireita = Procurar ();                   // Defina a Distancia da Direita
 delay (500);               
-servoSensor.write (90);                           // Gira o Servo com o sensor a 90 graus
+myservo.write (90);                           // Gira o Servo com o sensor a 90 graus
 delay (500);              
 CompareDistance ();                               // Encontre a distância mais longa.
 }
-// Função para calcular qual a distancia é melhor para o robô ir
 
+/***************************************************************************************************/
 
-
-
-
+/***************************************************************************************************/
 void CompareDistance () {                   
 if (DistanciaDireita > DistanciaEsquerda) {       // Se a direita está menos obstruída.
 Vireadireita ();                                // O robô vai virar a direita 
@@ -127,95 +179,63 @@ obstacolo ();
 }
 }
 
-
-
-
-
-// Função para fazer o carro parar
-void Parar()
-{
-Serial.println("Robô: Parar ");
-digitalWrite(in1, LOW);                           //Configurar a ponte h 
+void Parar() {
+  // Código para parar os motores
+digitalWrite(in1, LOW);                           
 digitalWrite(in2, LOW);
 digitalWrite(in3, LOW);
 digitalWrite(in4, LOW);
-delay(100);                                       //aguarda um tempo
 }
-// Função para fazer o robô andar para frente
 
-void Frente()
-{
-Serial.println("Robô: Frente ");
-digitalWrite(in1, HIGH);                          //Configurar a ponte h 
+void Frente() {
+  // Código para mover para frente
+digitalWrite(in1, HIGH);                          
 digitalWrite(in2, LOW);
 
 digitalWrite(in3, HIGH); 
 digitalWrite(in4, LOW);
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
 }
 
-
-void Vireadireita (){
-Serial.println("Robô: Direita ");
-digitalWrite(in1, HIGH);                           //MOTOR 1 
+void pulo() {
+  // Código para mover para frente
+digitalWrite(in1, HIGH);                          
 digitalWrite(in2, LOW);
 
-digitalWrite(in3, LOW);                          //MOTOR 2
-digitalWrite(in4, HIGH);
-
-delay(900);                                       //aguarda um tempo
-
-
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+digitalWrite(in3, HIGH); 
+digitalWrite(in4, LOW);
+delay(700);
 }
 
+void ParaTras() {
+  // Código para mover para trás
+digitalWrite(in1, LOW);                       
+digitalWrite(in2, HIGH);
 
+digitalWrite(in3, LOW); 
+digitalWrite(in4, HIGH);
+}
 
-
-void VireaEsquerda(){
-
-Serial.println("Robô: Esquerda ");                
+void Vireadireita() {
+  // Código para virar para direita
 digitalWrite(in1, LOW);                           //MOTOR 1 
 digitalWrite(in2, HIGH);
 
 digitalWrite(in3, HIGH);                          //MOTOR 2
 digitalWrite(in4, LOW);
-
-delay(900);                                       //aguarda um tempo
-
-
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
-}                        
-
-
-// Função que faz o robô andar para trás e emite som quando ele dá ré
-void ParaTras()
-{
-Serial.println("Robô: Ré ");
-digitalWrite(in1, LOW);                          //Configurar a ponte h 
-digitalWrite(in2, HIGH);
-
-digitalWrite(in3, LOW); 
-digitalWrite(in4, HIGH);
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+delay(900);
 }
 
-void Retorne () {    
-Serial.println("Robô: Girar ");      
-digitalWrite(in1, HIGH);                          //Configurar a ponte h 
+void VireaEsquerda() {
+  // Código para virar para esquerda
+digitalWrite(in1, HIGH);                           //MOTOR 1 
 digitalWrite(in2, LOW);
-digitalWrite(in3, HIGH);
-digitalWrite(in4, LOW);
-delay (1000);                                      //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);            // Defina a velocidade do motor Dois                         
+
+digitalWrite(in3, LOW);                          //MOTOR 2
+digitalWrite(in4, HIGH);
+delay(900);
 }
 
-
+// Outras funções e lógica conforme necessário
 void obstacolo () {    
 Serial.println("Robô: Parar ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
@@ -230,8 +250,6 @@ digitalWrite(in2, HIGH);
 digitalWrite(in3, LOW);
 digitalWrite(in4, HIGH);
 delay(300);                                       //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);  
 
 Serial.println("Robô: Direita ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
@@ -239,8 +257,6 @@ digitalWrite(in2, HIGH);
 digitalWrite(in3, HIGH);
 digitalWrite(in4, LOW);
 delay(300);                                       //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois); 
 
 Serial.println("Robô: Ré ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
@@ -248,8 +264,6 @@ digitalWrite(in2, HIGH);
 digitalWrite(in3, LOW);
 digitalWrite(in4, HIGH);
 delay(300);                                       //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois);  
 
 Serial.println("Robô: Direita ");
 digitalWrite(in1, LOW);                           //Configurar a ponte h 
@@ -257,6 +271,4 @@ digitalWrite(in2, HIGH);
 digitalWrite(in3, HIGH);
 digitalWrite(in4, LOW);
 delay(300);                                       //aguarda um tempo
-analogWrite(enA, velocidadeMotorUm);              // Defina a velocidade do motor Um
-analogWrite(enB, velocidadeMotorDois); 
-}                        
+} 
